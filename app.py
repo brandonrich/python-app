@@ -33,7 +33,7 @@ def health():
 @app.route('/api/greeting')
 def get_greeting():
     """Greeting endpoint"""
-    return jsonify({"message": "Hello, from Jenkins!"})
+    return jsonify({"message": "Hello, Jenkins!"})
 
 @app.route('/')
 def root():
