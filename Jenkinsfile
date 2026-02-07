@@ -1,11 +1,16 @@
 pipeline {
     agent any
 
+    triggers {
+        pollSCM('H/5 * * * *')  // Poll GitHub every 5 minutes for changes
+    }
+
     environment {
         APP_NAME = 'python-demo-app'
+        APP_PORT = '5001'
         DOCKER_IMAGE = "${APP_NAME}:${BUILD_NUMBER}"
     }
-    
+
     stages {
         stage('Install Dependencies') {
             steps {
@@ -43,17 +48,17 @@ pipeline {
                 sh """
                     docker stop ${APP_NAME} || true
                     docker rm ${APP_NAME} || true
-                    docker run -d --name ${APP_NAME} -p 5000:5000 ${DOCKER_IMAGE}
+                    docker run -d --name ${APP_NAME} -p ${APP_PORT}:5000 ${DOCKER_IMAGE}
                 """
             }
         }
 
         stage('Health Check') {
             steps {
-                sh '''
+                sh """
                     sleep 5
-                    curl -f http://localhost:5000/health || exit 1
-                '''
+                    curl -f http://localhost:${APP_PORT}/health || exit 1
+                """
             }
         }
     }
