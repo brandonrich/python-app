@@ -5,7 +5,8 @@ pipeline {
         APP_NAME = 'python-demo-app'
         DOCKER_IMAGE = "${APP_NAME}:${BUILD_NUMBER}"
     }
-
+    
+    stages {
         stage('Install Dependencies') {
             steps {
                 sh '''
