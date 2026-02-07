@@ -16,37 +16,31 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                dir('python-app') {
-                    sh '''
-                        python3 -m venv venv
-                        . venv/bin/activate
-                        pip install -r requirements.txt
-                    '''
-                }
+                sh '''
+                    python3 -m venv venv
+                    . venv/bin/activate
+                    pip install -r requirements.txt
+                '''
             }
         }
 
         stage('Run Tests') {
             steps {
-                dir('python-app') {
-                    sh '''
-                        . venv/bin/activate
-                        pytest test_app.py -v --junitxml=test-results.xml
-                    '''
-                }
+                sh '''
+                    . venv/bin/activate
+                    pytest test_app.py -v --junitxml=test-results.xml
+                '''
             }
             post {
                 always {
-                    junit 'python-app/test-results.xml'
+                    junit 'test-results.xml'
                 }
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                dir('python-app') {
-                    sh "docker build -t ${DOCKER_IMAGE} ."
-                }
+                sh "docker build -t ${DOCKER_IMAGE} ."
             }
         }
 
