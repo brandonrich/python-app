@@ -6,14 +6,6 @@ pipeline {
         DOCKER_IMAGE = "${APP_NAME}:${BUILD_NUMBER}"
     }
 
-    stages {
-        stage('Checkout') {
-            steps {
-                echo 'Checking out code...'
-                checkout scm
-            }
-        }
-
         stage('Install Dependencies') {
             steps {
                 sh '''
