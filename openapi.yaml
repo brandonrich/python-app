@@ -1,0 +1,68 @@
+openapi: 3.0.0
+info:
+  title: Python Demo App API
+  description: A simple Flask REST API for demonstrating CI/CD pipelines
+  version: 1.0.0
+servers:
+  - url: http://localhost:5000
+    description: Local development server
+
+paths:
+  /:
+    get:
+      summary: Root endpoint
+      description: Returns service information and available endpoints
+      responses:
+        '200':
+          description: Service information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  service:
+                    type: string
+                    example: python-demo-app
+                  version:
+                    type: string
+                    example: 1.0.0
+                  endpoints:
+                    type: array
+                    items:
+                      type: string
+                    example: ["/health", "/api/greeting"]
+
+  /health:
+    get:
+      summary: Health check endpoint
+      description: Returns the health status of the service
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  service:
+                    type: string
+                    example: python-demo-app
+
+  /api/greeting:
+    get:
+      summary: Get a greeting
+      description: Returns a greeting message
+      responses:
+        '200':
+          description: Successful greeting
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Hello, World!

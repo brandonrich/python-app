@@ -1,0 +1,11 @@
+# Ruff configuration
+line-length = 100
+
+[lint]
+# Enable pycodestyle (`E`), Pyflakes (`F`), and additional rules
+select = ["E", "F", "W", "I", "N"]
+
+[format]
+# Use single quotes
+quote-style = "single"
+indent-style = "space"
