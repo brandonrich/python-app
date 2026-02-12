@@ -42,6 +42,28 @@ pipeline {
             }
         }
 
+        stage('Push to Registry') {
+            steps {
+                // Note: This stage requires 'dockerhub-creds' credential in Jenkins
+                // For local demo purposes, this stage can be skipped
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-creds',
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )
+                ]) {
+                    sh """
+                        echo \${DOCKER_PASS} | docker login -u \${DOCKER_USER} --password-stdin
+                        docker tag ${DOCKER_IMAGE} \${DOCKER_USER}/python-demo-app:${BUILD_NUMBER}
+                        docker tag ${DOCKER_IMAGE} \${DOCKER_USER}/python-demo-app:latest
+                        docker push \${DOCKER_USER}/python-demo-app:${BUILD_NUMBER}
+                        docker push \${DOCKER_USER}/python-demo-app:latest
+                    """
+                }
+            }
+        }
+
         stage('Deploy') {
             steps {
                 echo 'Deploying application...'
