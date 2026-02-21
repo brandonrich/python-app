@@ -37,7 +37,7 @@ jobs:
 
       - name: Run security scan with Bandit
         run: |
-          bandit -r . -c .bandit
+          bandit -r . -c bandit.yml
 
       - name: Run tests with pytest
         run: |
