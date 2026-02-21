@@ -15,6 +15,9 @@ jobs:
   lint-and-test:
     name: Lint and Test
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
 
     steps:
       - name: Checkout code
@@ -27,19 +30,23 @@ jobs:
           cache: 'pip'
 
       - name: Install dependencies
+        working-directory: ./python-app
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
       - name: Run linting with Ruff
+        working-directory: ./python-app
         run: |
           ruff check .
 
       - name: Run security scan with Bandit
+        working-directory: ./python-app
         run: |
           bandit -r . -c .bandit
 
       - name: Run tests with pytest
+        working-directory: ./python-app
         run: |
           pytest test_app.py -v --junitxml=test-results.xml
 
@@ -47,7 +54,7 @@ jobs:
         uses: EnricoMi/publish-unit-test-result-action@v2
         if: always()
         with:
-          files: test-results.xml
+          files: python-app/test-results.xml
 
   build-and-push:
     name: Build and Push Docker Image
@@ -85,7 +92,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./python-app
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
