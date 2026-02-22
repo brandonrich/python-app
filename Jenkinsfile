@@ -13,6 +13,13 @@ pipeline {
     }
 
     stages {
+        stage('Checkout') {
+            steps {
+                echo "Checking out code from GitHub"
+                checkout scm
+            }
+        }
+                
         stage('Install Dependencies') {
             steps {
                 sh '''
@@ -34,6 +41,24 @@ pipeline {
                 always {
                     junit 'test-results.xml'
                 }
+            }
+        }
+
+        stage('Run linting with Ruff') {
+            steps {
+                sh '''
+                    . venv/bin/activate
+                    ruff check .
+                '''
+            }
+        }
+
+        stage('Run security scan with Bandit') {
+            steps {
+                sh '''
+                    . venv/bin/activate
+                    bandit -r . -c .bandit
+                '''
             }
         }
 
