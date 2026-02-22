@@ -1,7 +1,0 @@
-[bandit]
-# Skip assert warnings in test files (B101)
-# Skip hardcoded bind_all_interfaces (B104) - intentional for Docker
-skips: B101,B104
-
-# Exclude test files from certain checks
-exclude_dirs: []

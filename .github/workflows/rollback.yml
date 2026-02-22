@@ -1,0 +1,87 @@
+name: Rollback Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to rollback'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      previous_tag:
+        description: 'Previous working image tag to rollback to'
+        required: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  rollback:
+    name: Rollback ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify previous image exists
+        run: |
+          echo "Verifying image exists: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.previous_tag }}"
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.previous_tag }}
+          echo "✓ Image verified"
+
+      - name: Create backup of current deployment
+        run: |
+          # In production, this would back up current state before rollback
+          # For example: database snapshot, config backup, etc.
+          echo "Creating backup checkpoint for ${{ inputs.environment }}"
+          docker ps --filter "name=python-demo-app-${{ inputs.environment }}" --format "{{.Image}}" > backup-image.txt
+          cat backup-image.txt || echo "No running container to backup"
+
+      - name: Execute rollback
+        run: |
+          echo "Rolling back ${{ inputs.environment }} to ${{ inputs.previous_tag }}"
+
+          # Stop current version
+          docker stop python-demo-app-${{ inputs.environment }} || true
+          docker rm python-demo-app-${{ inputs.environment }} || true
+
+          # Start previous version
+          PORT=${{ inputs.environment == 'production' && '5001' || '5002' }}
+
+          docker run -d \
+            --name python-demo-app-${{ inputs.environment }} \
+            -p ${PORT}:5000 \
+            -e ENVIRONMENT=${{ inputs.environment }} \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.previous_tag }}
+
+      - name: Verify rollback success
+        run: |
+          sleep 5
+          PORT=${{ inputs.environment == 'production' && '5001' || '5002' }}
+          curl -f http://localhost:${PORT}/health || exit 1
+          echo "✓ Rollback successful - application is healthy"
+
+      - name: Rollback summary
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✓ Rollback completed successfully"
+            echo "Environment: ${{ inputs.environment }}"
+            echo "Rolled back to: ${{ inputs.previous_tag }}"
+            echo "Initiated by: ${{ github.actor }}"
+          else
+            echo "✗ Rollback failed - manual intervention required"
+          fi
