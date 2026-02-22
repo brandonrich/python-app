@@ -8,8 +8,7 @@ pipeline {
     environment {
         APP_NAME = 'python-demo-app'
         APP_PORT = '5001'
-        GIT_COMMIT_SHORT = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
-        DOCKER_IMAGE = "${APP_NAME}:${GIT_COMMIT_SHORT}"
+        DOCKER_IMAGE = "${APP_NAME}:${GIT_COMMIT}:${BUILD_NUMBER}"
     }
 
     stages {
