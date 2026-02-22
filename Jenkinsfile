@@ -8,7 +8,7 @@ pipeline {
     environment {
         APP_NAME = 'python-demo-app'
         APP_PORT = '5001'
-        DOCKER_IMAGE = "${APP_NAME}:${GIT_COMMIT}:${BUILD_NUMBER}"
+        DOCKER_IMAGE = "${APP_NAME}:${GIT_COMMIT}"
     }
 
     stages {
