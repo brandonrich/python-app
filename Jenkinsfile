@@ -8,7 +8,8 @@ pipeline {
     environment {
         APP_NAME = 'python-demo-app'
         APP_PORT = '5001'
-        DOCKER_IMAGE = "${APP_NAME}:${BUILD_NUMBER}"
+        GIT_COMMIT_SHORT = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
+        DOCKER_IMAGE = "${APP_NAME}:${GIT_COMMIT_SHORT}"
     }
 
     stages {
@@ -56,8 +57,10 @@ pipeline {
                     sh """
                         echo \${DOCKER_PASS} | docker login -u \${DOCKER_USER} --password-stdin
                         docker tag ${DOCKER_IMAGE} \${DOCKER_USER}/python-demo-app:${BUILD_NUMBER}
+                        docker tag ${DOCKER_IMAGE} \${DOCKER_USER}/python-demo-app:${GIT_COMMIT_SHORT}
                         docker tag ${DOCKER_IMAGE} \${DOCKER_USER}/python-demo-app:latest
                         docker push \${DOCKER_USER}/python-demo-app:${BUILD_NUMBER}
+                        docker push \${DOCKER_USER}/python-demo-app:${GIT_COMMIT_SHORT}
                         docker push \${DOCKER_USER}/python-demo-app:latest
                     """
                 }
