@@ -20,7 +20,7 @@ jobs:
       pull-requests: write
 
     steps:
-      - name: Checkout code
+      - name: Check out code
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -83,7 +83,7 @@ jobs:
             type=ref,event=branch
             type=ref,event=pr
             type=sha,prefix={{branch}}-
-            type=sha
+            type=sha,format=long,prefix=
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push Docker image
