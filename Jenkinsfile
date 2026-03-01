@@ -57,13 +57,8 @@ pipeline {
             steps {
                 sh '''
                     . venv/bin/activate
-                    bandit -r . -c bandit.yml -f xml -o bandit-results.xml || true
+                    bandit -r . -c bandit.yml
                 '''
-            }
-            post {
-                always {
-                    junit 'bandit-results.xml'
-                }
             }
         }
 
