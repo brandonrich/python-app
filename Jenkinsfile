@@ -90,26 +90,11 @@ pipeline {
                     """
                 }
             }
-        }
-
-        stage('Deploy') {
-            steps {
-                echo 'Deploying application...'
-                sh """
-                    docker stop ${APP_NAME} || true
-                    docker rm ${APP_NAME} || true
-                    docker run -d --name ${APP_NAME} -p ${APP_PORT}:5000 ${DOCKER_IMAGE}
-                """
-            }
-        }
-
-        stage('Health Check') {
-            steps {
-                sh """
-                    sleep 5
-                    curl -f http://localhost:${APP_PORT}/health || exit 1
-                """
-            }
+            post {
+                always {
+                    sh 'docker logout'
+                }
+            }            
         }
     }
 
