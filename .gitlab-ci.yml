@@ -1,0 +1,73 @@
+stages:
+  - test
+  - build
+  - push
+
+variables:
+  APP_NAME: python-demo-app
+  REGISTRY: registry.gitlab.com
+  IMAGE_NAME: $CI_REGISTRY_IMAGE
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+
+cache:
+  paths:
+    - .cache/pip
+    - venv/
+
+test:
+  stage: test
+  image: python:3.13
+  before_script:
+    - python -m venv venv
+    - source venv/bin/activate
+    - pip install --upgrade pip
+    - pip install -r requirements.txt
+  script:
+    - echo "Running linting with Ruff"
+    - ruff check .
+    - echo "Running security scan with Bandit"
+    - bandit -r . -c bandit.yml
+    - echo "Running tests with pytest"
+    - pytest test_app.py -v --junitxml=test-results.xml
+  artifacts:
+    reports:
+      junit: test-results.xml
+    expire_in: 30 days
+  only:
+    - branches
+
+build:
+  stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - export GIT_COMMIT_SHORT=$(echo $CI_COMMIT_SHA | cut -c1-7)
+    - docker build -t $IMAGE_NAME:$GIT_COMMIT_SHORT .
+    - docker tag $IMAGE_NAME:$GIT_COMMIT_SHORT $IMAGE_NAME:latest
+  only:
+    - branches
+  dependencies: []
+
+push:
+  stage: push
+  image: docker:latest
+  services:
+    - docker:dind
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - export GIT_COMMIT_SHORT=$(echo $CI_COMMIT_SHA | cut -c1-7)
+    - docker pull $IMAGE_NAME:$GIT_COMMIT_SHORT
+    - docker tag $IMAGE_NAME:$GIT_COMMIT_SHORT $IMAGE_NAME:$CI_COMMIT_REF_SLUG-$CI_PIPELINE_ID
+    - docker tag $IMAGE_NAME:$GIT_COMMIT_SHORT $IMAGE_NAME:latest
+    - docker push $IMAGE_NAME:$CI_COMMIT_REF_SLUG-$CI_PIPELINE_ID
+    - docker push $IMAGE_NAME:latest
+  after_script:
+    - docker logout
+  only:
+    - main
+  dependencies:
+    - build
