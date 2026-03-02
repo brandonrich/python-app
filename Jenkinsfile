@@ -58,7 +58,9 @@ pipeline {
                 sh '''
                     . .venv/bin/activate
                     pwd
-                    ls -la bandit.yml                    
+                    ls -la bandit.yml  
+                    echo "contents of bandit.yml:"
+                    cat bandit.yml                  
                     bandit -r . -c bandit.yml
                 '''
             }
