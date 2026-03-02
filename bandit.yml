@@ -1,9 +1,4 @@
-exclude:
-    - .venv
-    - venv
-    - .git
-    - .pytest_cache
-    - __pycache__
+exclude_dirs: [.venv, .git, .pytest_cache, __pycache__]
 
 # example: run specific tests
 tests: ['B201', 'B301']
