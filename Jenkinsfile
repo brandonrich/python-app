@@ -57,6 +57,8 @@ pipeline {
             steps {
                 sh '''
                     . .venv/bin/activate
+                    pwd
+                    ls -la bandit.yml                    
                     bandit -r . -c bandit.yml
                 '''
             }
