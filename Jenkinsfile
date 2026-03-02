@@ -23,8 +23,8 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 sh '''
-                    python3 -m venv venv
-                    . venv/bin/activate
+                    python3 -m venv .venv
+                    . .venv/bin/activate
                     pip install -r requirements.txt
                 '''
             }
@@ -33,7 +33,7 @@ pipeline {
         stage('Run Tests') {
             steps {
                 sh '''
-                    . venv/bin/activate
+                    . .venv/bin/activate
                     pytest test_app.py -v --junitxml=test-results.xml
                 '''
             }
@@ -47,7 +47,7 @@ pipeline {
         stage('Run linting with Ruff') {
             steps {
                 sh '''
-                    . venv/bin/activate
+                    . .venv/bin/activate
                     ruff check .
                 '''
             }
@@ -56,7 +56,7 @@ pipeline {
         stage('Run security scan with Bandit') {
             steps {
                 sh '''
-                    . venv/bin/activate
+                    . .venv/bin/activate
                     bandit -r . -c bandit.yml
                 '''
             }
