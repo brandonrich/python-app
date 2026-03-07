@@ -35,3 +35,13 @@ def test_root(client):
     data = response.get_json()
     assert data['service'] == 'python-demo-app'
     assert 'version' in data
+
+def test_health_response_structure(client):
+    """Test that health endpoint returns all expected fields"""
+    response = client.get('/health')
+    assert response.status_code == 200
+    data = response.get_json()
+    assert 'status' in data
+    assert 'service' in data
+    assert isinstance(data['status'], str)
+    assert isinstance(data['service'], str)
