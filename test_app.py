@@ -47,10 +47,3 @@ def test_failing_greeting_message(client):
     response = client.get('/api/greeting')
     data = response.get_json()
     assert data['message'] == 'Goodbye, Jenkins!', "Greeting should say Goodbye"
-
-def test_failing_root_service_name(client):
-    """Intentional failing test - service name mismatch"""
-    response = client.get('/')
-    data = response.get_json()
-    assert data['service'] == 'wrong-service-name', "Service name should be different"
-
