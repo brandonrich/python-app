@@ -35,15 +35,3 @@ def test_root(client):
     data = response.get_json()
     assert data['service'] == 'python-demo-app'
     assert 'version' in data
-
-def test_failing_health_check(client):
-    """Intentional failing test - health should return unhealthy"""
-    response = client.get('/health')
-    data = response.get_json()
-    assert data['status'] == 'unhealthy', "Health status should be unhealthy"
-
-def test_failing_greeting_message(client):
-    """Intentional failing test - greeting should be different"""
-    response = client.get('/api/greeting')
-    data = response.get_json()
-    assert data['message'] == 'Goodbye, Jenkins!', "Greeting should say Goodbye"
