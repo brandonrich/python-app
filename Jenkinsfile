@@ -30,39 +30,43 @@ pipeline {
             }
         }
 
-        stage('Run Tests') {
-            steps {
-                sh '''
-                    . .venv/bin/activate
-                    pytest test_app.py -v --junitxml=test-results.xml
-                '''
-            }
-            post {
-                always {
-                    junit 'test-results.xml'
+        stage('Quality Checks') {
+            parallel {
+                stage('Run Tests') {
+                    steps {
+                        sh '''
+                            . .venv/bin/activate
+                            pytest test_app.py -v --junitxml=test-results.xml
+                        '''
+                    }
+                    post {
+                        always {
+                            junit 'test-results.xml'
+                        }
+                    }
                 }
-            }
-        }
 
-        stage('Run linting with Ruff') {
-            steps {
-                sh '''
-                    . .venv/bin/activate
-                    ruff check .
-                '''
-            }
-        }
+                stage('Run linting with Ruff') {
+                    steps {
+                        sh '''
+                            . .venv/bin/activate
+                            ruff check .
+                        '''
+                    }
+                }
 
-        stage('Run security scan with Bandit') {
-            steps {
-                sh '''
-                    . .venv/bin/activate
-                    pwd
-                    ls -la bandit.yml  
-                    echo "contents of bandit.yml:"
-                    cat bandit.yml                  
-                    bandit -r . -c bandit.yml
-                '''
+                stage('Run security scan with Bandit') {
+                    steps {
+                        sh '''
+                            . .venv/bin/activate
+                            pwd
+                            ls -la bandit.yml  
+                            echo "contents of bandit.yml:"
+                            cat bandit.yml                  
+                            bandit -r . -c bandit.yml
+                        '''
+                    }
+                }
             }
         }
 
