@@ -54,13 +54,3 @@ def test_failing_root_service_name(client):
     data = response.get_json()
     assert data['service'] == 'wrong-service-name', "Service name should be different"
 
-def test_failing_status_code(client):
-    """Intentional failing test - wrong status code"""
-    response = client.get('/health')
-    assert response.status_code == 404, "Health endpoint should return 404"
-
-def test_failing_missing_field(client):
-    """Intentional failing test - missing required field"""
-    response = client.get('/')
-    data = response.get_json()
-    assert 'nonexistent_field' in data, "Response should have nonexistent_field"
