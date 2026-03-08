@@ -46,6 +46,6 @@ def test_health_response_structure(client):
     assert isinstance(data['status'], str)
     assert isinstance(data['service'], str)
 
-def test_intentional_failure():
-    """This test is intentionally failing"""
-    assert 1 + 1 == 5, "This test is meant to fail!"
+# def test_intentional_failure():
+#     """This test is intentionally failing"""
+#     assert 1 + 1 == 5, "This test is meant to fail!"
