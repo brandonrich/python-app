@@ -19,11 +19,7 @@ pipeline {
                 checkout scm
                 slackSend(
                     channel: '#build',
-                    message: "Build requested for ${env.JOB_NAME} #${env.BUILD_NUMBER}"
-                )
-                input(
-                    message: 'Start build?',
-                    ok: 'Start'
+                    message: "🛠️ Build started for ${env.JOB_NAME} #${env.BUILD_NUMBER}\nLink: ${env.BUILD_URL}"
                 )
             }
         }
@@ -117,9 +113,17 @@ pipeline {
     post {
         success {
             echo 'Pipeline completed successfully!'
+            slackSend(
+                channel: '#build',
+                message: "✅ Build succeeded for ${env.JOB_NAME} #${env.BUILD_NUMBER}\nLink: ${env.BUILD_URL}"
+            )
         }
         failure {
             echo 'Pipeline failed!'
+            slackSend(
+                channel: '#build',
+                message: "🚨 Build failed for ${env.JOB_NAME} #${env.BUILD_NUMBER}\nLink: ${env.BUILD_URL}\nError: ${env.BUILD_LOG}"
+            )
         }
         always {
             echo 'Cleaning up...'
