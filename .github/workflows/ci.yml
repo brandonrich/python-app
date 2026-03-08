@@ -53,6 +53,7 @@ jobs:
           files: test-results.xml
 
       - name: Send to Slack
+        if: always()
         uses: slackapi/slack-github-action@v2.1.1
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
