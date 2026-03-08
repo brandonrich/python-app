@@ -132,14 +132,10 @@ pipeline {
         }
         failure {
             echo 'Pipeline failed!'
-            script {
-                def log = currentBuild.rawBuild.getLog(20)  // Last 20 lines of the build log
-                def errorMsg = log.join('\n')
-                slackSend(
-                    channel: '#build',
-                    message: "🚨 Build failed for ${env.JOB_NAME} #${env.BUILD_NUMBER}\nLink: ${env.BUILD_URL}\nError: ${errorMsg}"
-                )
-            }
+            slackSend(
+                channel: '#build',
+                message: "🚨 Build failed for ${env.JOB_NAME} #${env.BUILD_NUMBER}\nCommit: ${env.GIT_COMMIT_SHORT}\nView logs: ${env.BUILD_URL}console"
+            )
             emailext(
                 to: 'brich@nd.edu',
                 subject: "🚨 Build Failed: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
