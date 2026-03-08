@@ -48,4 +48,4 @@ def test_health_response_structure(client):
 
 def test_intentional_failure():
     """This test is intentionally failing"""
-    assert 1 + 1 == 3, "This test is meant to fail!"
+    assert 1 + 1 == 5, "This test is meant to fail!"
