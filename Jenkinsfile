@@ -19,7 +19,11 @@ pipeline {
                 checkout scm
                 slackSend(
                     channel: '#build',
-                    message: "Build started for ${env.JOB_NAME} #${env.BUILD_NUMBER}"
+                    message: "Build requested for ${env.JOB_NAME} #${env.BUILD_NUMBER}"
+                )
+                input(
+                    message: 'Start build?',
+                    ok: 'Start'
                 )
             }
         }
