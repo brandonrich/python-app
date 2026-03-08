@@ -17,6 +17,10 @@ pipeline {
             steps {
                 echo "Checking out code from GitHub"
                 checkout scm
+                slackSend(
+                    channel: '#build',
+                    message: "Build started for ${env.JOB_NAME} #${env.BUILD_NUMBER}"
+                )
             }
         }
                 
