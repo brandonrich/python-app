@@ -136,7 +136,11 @@ pipeline {
                 channel: '#build',
                 message: "🚨 Build failed for ${env.JOB_NAME} #${env.BUILD_NUMBER}\nLink: ${env.BUILD_URL}\nError: ${env.BUILD_LOG}"
             )
-            emailext to: 'brich@nd.edu'
+            emailext (
+                to: 'brich@nd.edu',
+                subject: '$DEFAULT_SUBJECT',
+                body: '$DEFAULT_CONTENT'
+            )
         }
         always {
             echo 'Cleaning up...'
