@@ -20,19 +20,18 @@ jobs:
       pull-requests: write
 
     steps:
-      - name: Send to Slack
-        if: always()
+      - name: Notify Slack - Build Started
         uses: slackapi/slack-github-action@v2.1.1
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
           webhook-type: incoming-webhook
           payload: |
-            text: "🛠️ Starting Build for ${{ github.repository }} - ${{ github.ref }}\n${{ github.event.pull_request.html_url || github.event.head_commit.url }}"
+            text: "🛠️ Build #${{ github.run_number }} started for ${{ github.repository }}"
             blocks:
               - type: "section"
                 text:
                   type: "mrkdwn"
-                  text: "GitHub Action build result: ${{ job.status }}\n${{ github.event.pull_request.html_url || github.event.head_commit.url }}"
+                  text: "🛠️ *Build Started*\n*Repository:* ${{ github.repository }}\n*Branch:* `${{ github.ref_name }}`\n*Build:* #${{ github.run_number }}\n*Commit:* `${{ github.sha }}`\n*Link:* <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Workflow>"
 
       - name: Check out code
         uses: actions/checkout@v4
@@ -66,19 +65,33 @@ jobs:
         with:
           files: test-results.xml
 
-      - name: Send to Slack
-        if: always()
+      - name: Notify Slack - Build Success
+        if: success()
         uses: slackapi/slack-github-action@v2.1.1
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
           webhook-type: incoming-webhook
           payload: |
-            text: "*GitHub Action build result*: ${{ job.status }}\n${{ github.event.pull_request.html_url || github.event.head_commit.url }}"
+            text: "✅ Build #${{ github.run_number }} succeeded for ${{ github.repository }}"
             blocks:
               - type: "section"
                 text:
                   type: "mrkdwn"
-                  text: "GitHub Action build result: ${{ job.status }}\n${{ github.event.pull_request.html_url || github.event.head_commit.url }}"
+                  text: "✅ *Build Succeeded*\n*Repository:* ${{ github.repository }}\n*Branch:* `${{ github.ref_name }}`\n*Build:* #${{ github.run_number }}\n*Commit:* `${{ github.sha }}`\n*Link:* <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Workflow>"
+
+      - name: Notify Slack - Build Failure
+        if: failure()
+        uses: slackapi/slack-github-action@v2.1.1
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            text: "🚨 Build #${{ github.run_number }} failed for ${{ github.repository }}"
+            blocks:
+              - type: "section"
+                text:
+                  type: "mrkdwn"
+                  text: "🚨 *Build Failed*\n*Repository:* ${{ github.repository }}\n*Branch:* `${{ github.ref_name }}`\n*Build:* #${{ github.run_number }}\n*Commit:* `${{ github.sha }}`\n*Link:* <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Workflow>"
 
   build-and-push:
     name: Build and Push Docker Image
