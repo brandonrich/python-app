@@ -132,14 +132,26 @@ pipeline {
         }
         failure {
             echo 'Pipeline failed!'
-            slackSend(
-                channel: '#build',
-                message: "🚨 Build failed for ${env.JOB_NAME} #${env.BUILD_NUMBER}\nLink: ${env.BUILD_URL}\nError: ${env.BUILD_LOG}"
-            )
-            emailext (
+            script {
+                def log = currentBuild.rawBuild.getLog(20)  // Last 20 lines of the build log
+                def errorMsg = log.join('\n')
+                slackSend(
+                    channel: '#build',
+                    message: "🚨 Build failed for ${env.JOB_NAME} #${env.BUILD_NUMBER}\nLink: ${env.BUILD_URL}\nError: ${errorMsg}"
+                )
+            }
+            emailext(
                 to: 'brich@nd.edu',
-                subject: '$DEFAULT_SUBJECT',
-                body: '$DEFAULT_CONTENT'
+                subject: "🚨 Build Failed: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                body: """
+                    <p>Build failed!</p>
+                    <p><strong>Job:</strong> ${env.JOB_NAME}</p>
+                    <p><strong>Build Number:</strong> ${env.BUILD_NUMBER}</p>
+                    <p><strong>Commit:</strong> ${env.GIT_COMMIT_SHORT}</p>
+                    <p><strong>Link:</strong> <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
+                    <p><strong>Console:</strong> <a href="${env.BUILD_URL}console">${env.BUILD_URL}console</a></p>
+                """,
+                mimeType: 'text/html'
             )
         }
         always {
