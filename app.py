@@ -47,4 +47,4 @@ def root():
 
 if __name__ == '__main__':
     # Bind to 0.0.0.0 for Docker container access
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5001)
