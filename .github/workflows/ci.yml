@@ -2,7 +2,7 @@ name: CI Pipeline
 
 on:
   push:
-    branches: [ main, github-actions ]
+    branches: [ main, github-actions, ecs-deploy-tags-not-latest ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
@@ -200,13 +200,66 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Update ECS service
+      - name: Create task definition revision with SHA image
+        id: register-task-def
+        env:
+          IMAGE_URI: ${{ needs.build-and-push.outputs.image-uri }}
+        run: |
+          set -euo pipefail
+
+          echo "Preparing deployment for image: $IMAGE_URI"
+
+          CURRENT_TASK_DEF_ARN=$(aws ecs describe-services \
+            --cluster "${{ env.ECS_CLUSTER }}" \
+            --services "${{ env.ECS_SERVICE }}" \
+            --region "${{ env.AWS_REGION }}" \
+            --query 'services[0].taskDefinition' \
+            --output text)
+
+          aws ecs describe-task-definition \
+            --task-definition "$CURRENT_TASK_DEF_ARN" \
+            --region "${{ env.AWS_REGION }}" \
+            --query 'taskDefinition' > task-definition.json
+
+          jq --arg IMAGE_URI "$IMAGE_URI" --arg CONTAINER_NAME "${{ env.APP_NAME }}" '
+            del(
+              .taskDefinitionArn,
+              .revision,
+              .status,
+              .requiresAttributes,
+              .compatibilities,
+              .registeredAt,
+              .registeredBy
+            )
+            | .containerDefinitions = (
+                .containerDefinitions
+                | map(if .name == $CONTAINER_NAME then .image = $IMAGE_URI else . end)
+              )
+          ' task-definition.json > task-definition-new.json
+
+          NEW_TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --region "${{ env.AWS_REGION }}" \
+            --cli-input-json file://task-definition-new.json \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+
+          echo "task-definition-arn=$NEW_TASK_DEF_ARN" >> "$GITHUB_OUTPUT"
+
+      - name: Update ECS service to new task definition
         run: |
           aws ecs update-service \
-            --cluster ${{ env.ECS_CLUSTER }} \
-            --service ${{ env.ECS_SERVICE }} \
+            --cluster "${{ env.ECS_CLUSTER }}" \
+            --service "${{ env.ECS_SERVICE }}" \
+            --task-definition "${{ steps.register-task-def.outputs.task-definition-arn }}" \
             --force-new-deployment \
-            --region ${{ env.AWS_REGION }}
+            --region "${{ env.AWS_REGION }}"
+
+      - name: Wait for ECS service stability
+        run: |
+          aws ecs wait services-stable \
+            --cluster "${{ env.ECS_CLUSTER }}" \
+            --services "${{ env.ECS_SERVICE }}" \
+            --region "${{ env.AWS_REGION }}"
 
   notify-end:
     name: Notify Build Complete
