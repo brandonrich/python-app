@@ -5,6 +5,7 @@ on:
     branches: [ main, github-actions ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
 
 env:
   APP_NAME: python-demo-app
