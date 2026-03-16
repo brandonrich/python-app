@@ -2,7 +2,7 @@ name: CI Pipeline
 
 on:
   push:
-    branches: [ main, github-actions, ecs-deploy-tags-not-latest ]
+    branches: [ main, github-actions, ecs-deploy-tags-not-latest, ecs-deploy-tags-not-latest-with-rollback]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
