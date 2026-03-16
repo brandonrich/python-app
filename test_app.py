@@ -26,7 +26,7 @@ def test_greet(client):
     response = client.get('/api/greeting')
     assert response.status_code == 200
     data = response.get_json()
-    assert data['message'] == 'Hello, Brandon!'
+    assert data['message'] == 'Hello, continuous delivery!'
 
 def test_root(client):
     """Test root endpoint"""
