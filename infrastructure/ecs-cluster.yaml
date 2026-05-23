@@ -1,0 +1,86 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'ECS Cluster for Python Demo App'
+
+Parameters:
+  ClusterName:
+    Type: String
+    Default: python-demo-cluster
+    Description: Name of the ECS cluster
+
+Resources:
+  # ============== CloudWatch Logs ==============
+  ECSLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /ecs/python-demo-app
+      RetentionInDays: 7
+
+  # ============== ECR Repository ==============
+  ECRRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: python-demo-app
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Keep last 5 images",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 5
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
+      Tags:
+        - Key: Name
+          Value: python-demo-app
+
+  # ============== ECS Cluster ==============
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Ref ClusterName
+      ClusterSettings:
+        - Name: containerInsights
+          Value: enabled
+      Tags:
+        - Key: Name
+          Value: python-demo-cluster
+
+  # ============== CloudWatch Container Insights ==============
+  ClusterCapacityProviders:
+    Type: AWS::ECS::ClusterCapacityProviderAssociations
+    Properties:
+      Cluster: !Ref ECSCluster
+      CapacityProviders:
+        - FARGATE
+        - FARGATE_SPOT
+      DefaultCapacityProviderStrategy:
+        - CapacityProvider: FARGATE
+          Weight: 1
+          Base: 1
+
+Outputs:
+  ECSClusterId:
+    Value: !Ref ECSCluster
+    Export:
+      Name: python-demo-ecs-cluster-name
+
+  ECRRepositoryUri:
+    Value: !GetAtt ECRRepository.RepositoryUri
+    Export:
+      Name: python-demo-ecr-uri
+
+  ECSLogGroupName:
+    Value: !Ref ECSLogGroup
+    Export:
+      Name: python-demo-ecs-log-group
