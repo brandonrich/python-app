@@ -1,0 +1,98 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'ECS Load Balancer and Target Group - Using Existing VPC'
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: Existing VPC ID
+
+  PublicSubnet1Id:
+    Type: AWS::EC2::Subnet::Id
+    Description: First public subnet for ALB
+
+  PublicSubnet2Id:
+    Type: AWS::EC2::Subnet::Id
+    Description: Second public subnet for ALB
+
+  ALBSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: Security group for ALB
+
+  ContainerPort:
+    Type: Number
+    Default: 5001
+    Description: Port the container listens on
+
+Resources:
+  # ============== Application Load Balancer ==============
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: python-demo-alb
+      Type: application
+      Scheme: internet-facing
+      IpAddressType: ipv4
+      Subnets:
+        - !Ref PublicSubnet1Id
+        - !Ref PublicSubnet2Id
+      SecurityGroups:
+        - !Ref ALBSecurityGroupId
+      Tags:
+        - Key: Name
+          Value: python-demo-alb
+
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: python-demo-tg
+      Port: !Ref ContainerPort
+      Protocol: HTTP
+      VpcId: !Ref VpcId
+      TargetType: ip
+      HealthCheckEnabled: true
+      HealthCheckIntervalSeconds: 30
+      HealthCheckPath: /health
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 2
+      Matcher:
+        HttpCode: '200'
+      Tags:
+        - Key: Name
+          Value: python-demo-tg
+
+  ALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !GetAtt ApplicationLoadBalancer.LoadBalancerArn
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !GetAtt TargetGroup.TargetGroupArn
+
+Outputs:
+  LoadBalancerDNS:
+    Value: !GetAtt ApplicationLoadBalancer.DNSName
+    Export:
+      Name: python-demo-alb-dns
+    Description: DNS name of the load balancer
+
+  LoadBalancerArn:
+    Value: !GetAtt ApplicationLoadBalancer.LoadBalancerArn
+    Export:
+      Name: python-demo-alb-arn
+    Description: ARN of the load balancer
+
+  TargetGroupArn:
+    Value: !GetAtt TargetGroup.TargetGroupArn
+    Export:
+      Name: python-demo-tg-arn
+    Description: ARN of the target group
+
+  ALBListenerArn:
+    Value: !GetAtt ALBListener.ListenerArn
+    Export:
+      Name: python-demo-alb-listener-arn
+    Description: ARN of the ALB listener

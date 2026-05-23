@@ -10,69 +10,196 @@ on:
         options:
           - staging
           - production
-      previous_tag:
-        description: 'Previous working image tag to rollback to'
+      rollback_tag:
+        description: 'ECR image tag to roll back to (for example: commit SHA)'
         required: true
+      rollback_reason:
+        description: 'Reason for rollback (incident/ticket/context)'
+        required: true
+      ecs_cluster:
+        description: 'Target ECS cluster'
+        required: true
+        default: python-demo-cluster
+      ecs_service:
+        description: 'Target ECS service'
+        required: true
+        default: python-demo-app
+      confirm_production:
+        description: 'Required only for production: type ROLLBACK_PRODUCTION'
+        required: false
+        default: ''
+      dry_run:
+        description: 'Validate and prepare rollback without updating ECS service'
+        required: false
+        type: boolean
+        default: false
 
 env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  AWS_REGION: us-east-1
+  APP_NAME: python-demo-app
 
 jobs:
   rollback:
     name: Rollback ${{ inputs.environment }}
     runs-on: ubuntu-latest
+    permissions: {}
     environment:
       name: ${{ inputs.environment }}
+    outputs:
+      previous-task-definition-arn: ${{ steps.prepare-rollback.outputs.previous-task-definition-arn }}
+      rollback-task-definition-arn: ${{ steps.prepare-rollback.outputs.rollback-task-definition-arn }}
+      rollback-image-uri: ${{ steps.validate-image.outputs.rollback-image-uri }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
 
-      - name: Verify previous image exists
+      - name: Confirm production rollback intent
+        if: inputs.environment == 'production'
         run: |
-          echo "Verifying image exists: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.previous_tag }}"
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.previous_tag }}
-          echo "✓ Image verified"
+          if [ "${{ inputs.confirm_production }}" != "ROLLBACK_PRODUCTION" ]; then
+            echo "Production rollback requires confirm_production=ROLLBACK_PRODUCTION"
+            exit 1
+          fi
 
-      - name: Create backup of current deployment
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Validate rollback image exists in ECR
+        id: validate-image
         run: |
-          # In production, this would back up current state before rollback
-          # For example: database snapshot, config backup, etc.
-          echo "Creating backup checkpoint for ${{ inputs.environment }}"
-          docker ps --filter "name=python-demo-app-${{ inputs.environment }}" --format "{{.Image}}" > backup-image.txt
-          cat backup-image.txt || echo "No running container to backup"
+          set -euo pipefail
 
-      - name: Execute rollback
+          ROLLBACK_IMAGE_URI="${{ steps.login-ecr.outputs.registry }}/${{ env.APP_NAME }}:${{ inputs.rollback_tag }}"
+
+          aws ecr describe-images \
+            --repository-name "${{ env.APP_NAME }}" \
+            --image-ids imageTag="${{ inputs.rollback_tag }}" \
+            --region "${{ env.AWS_REGION }}" > /dev/null
+
+          echo "rollback-image-uri=$ROLLBACK_IMAGE_URI" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare rollback task definition
+        id: prepare-rollback
         run: |
-          echo "Rolling back ${{ inputs.environment }} to ${{ inputs.previous_tag }}"
+          set -euo pipefail
 
-          # Stop current version
-          docker stop python-demo-app-${{ inputs.environment }} || true
-          docker rm python-demo-app-${{ inputs.environment }} || true
+          CURRENT_TASK_DEF_ARN=$(aws ecs describe-services \
+            --cluster "${{ inputs.ecs_cluster }}" \
+            --services "${{ inputs.ecs_service }}" \
+            --region "${{ env.AWS_REGION }}" \
+            --query 'services[0].taskDefinition' \
+            --output text)
 
-          # Start previous version
-          PORT=${{ inputs.environment == 'production' && '5001' || '5002' }}
+          if [ -z "$CURRENT_TASK_DEF_ARN" ] || [ "$CURRENT_TASK_DEF_ARN" = "None" ]; then
+            echo "Unable to resolve current ECS task definition for service ${{ inputs.ecs_service }}"
+            exit 1
+          fi
 
-          docker run -d \
-            --name python-demo-app-${{ inputs.environment }} \
-            -p ${PORT}:5000 \
-            -e ENVIRONMENT=${{ inputs.environment }} \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.previous_tag }}
+          echo "previous-task-definition-arn=$CURRENT_TASK_DEF_ARN" >> "$GITHUB_OUTPUT"
 
-      - name: Verify rollback success
+          aws ecs describe-task-definition \
+            --task-definition "$CURRENT_TASK_DEF_ARN" \
+            --region "${{ env.AWS_REGION }}" \
+            --query 'taskDefinition' > task-definition-current.json
+
+          jq --arg IMAGE_URI "${{ steps.validate-image.outputs.rollback-image-uri }}" --arg CONTAINER_NAME "${{ env.APP_NAME }}" '
+            del(
+              .taskDefinitionArn,
+              .revision,
+              .status,
+              .requiresAttributes,
+              .compatibilities,
+              .registeredAt,
+              .registeredBy
+            )
+            | .containerDefinitions = (
+                .containerDefinitions
+                | map(if .name == $CONTAINER_NAME then .image = $IMAGE_URI else . end)
+              )
+          ' task-definition-current.json > task-definition-rollback.json
+
+          ROLLBACK_TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --region "${{ env.AWS_REGION }}" \
+            --cli-input-json file://task-definition-rollback.json \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+
+          echo "rollback-task-definition-arn=$ROLLBACK_TASK_DEF_ARN" >> "$GITHUB_OUTPUT"
+
+      - name: Tag rollback task definition
         run: |
-          sleep 5
-          PORT=${{ inputs.environment == 'production' && '5001' || '5002' }}
-          curl -f http://localhost:${PORT}/health || exit 1
-          echo "✓ Rollback successful - application is healthy"
+          ROLLED_BACK_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          aws ecs tag-resource \
+            --resource-arn "${{ steps.prepare-rollback.outputs.rollback-task-definition-arn }}" \
+            --region "${{ env.AWS_REGION }}" \
+            --tags \
+              key=app,value="${{ env.APP_NAME }}" \
+              key=service,value="${{ inputs.ecs_service }}" \
+              key=cluster,value="${{ inputs.ecs_cluster }}" \
+              key=rollback,value=true \
+              key=rollback_initiated_by,value="${{ github.actor }}" \
+              key=rollback_reason,value="${{ inputs.rollback_reason }}" \
+              key=rollback_from_task_definition,value="${{ steps.prepare-rollback.outputs.previous-task-definition-arn }}" \
+              key=rollback_image_uri,value="${{ steps.validate-image.outputs.rollback-image-uri }}" \
+              key=rolled_back_at,value="$ROLLED_BACK_AT"
+
+      - name: Execute ECS rollback
+        if: ${{ !inputs.dry_run }}
+        run: |
+          aws ecs update-service \
+            --cluster "${{ inputs.ecs_cluster }}" \
+            --service "${{ inputs.ecs_service }}" \
+            --task-definition "${{ steps.prepare-rollback.outputs.rollback-task-definition-arn }}" \
+            --force-new-deployment \
+            --region "${{ env.AWS_REGION }}"
+
+      - name: Wait for ECS service stability
+        if: ${{ !inputs.dry_run }}
+        run: |
+          aws ecs wait services-stable \
+            --cluster "${{ inputs.ecs_cluster }}" \
+            --services "${{ inputs.ecs_service }}" \
+            --region "${{ env.AWS_REGION }}"
+
+      - name: Write rollback metadata artifact
+        if: always()
+        run: |
+          ROLLED_BACK_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          cat > rollback-metadata.json <<EOF
+          {
+            "environment": "${{ inputs.environment }}",
+            "cluster": "${{ inputs.ecs_cluster }}",
+            "service": "${{ inputs.ecs_service }}",
+            "aws_region": "${{ env.AWS_REGION }}",
+            "rollback_tag": "${{ inputs.rollback_tag }}",
+            "rollback_reason": "${{ inputs.rollback_reason }}",
+            "rollback_image_uri": "${{ steps.validate-image.outputs.rollback-image-uri }}",
+            "previous_task_definition_arn": "${{ steps.prepare-rollback.outputs.previous-task-definition-arn }}",
+            "rollback_task_definition_arn": "${{ steps.prepare-rollback.outputs.rollback-task-definition-arn }}",
+            "dry_run": "${{ inputs.dry_run }}",
+            "initiated_by": "${{ github.actor }}",
+            "github_run_id": "${{ github.run_id }}",
+            "github_run_number": "${{ github.run_number }}",
+            "github_ref": "${{ github.ref }}",
+            "rolled_back_at_utc": "$ROLLED_BACK_AT"
+          }
+          EOF
+
+      - name: Upload rollback metadata artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rollback-metadata-${{ github.run_id }}
+          path: rollback-metadata.json
 
       - name: Rollback summary
         if: always()
@@ -80,7 +207,14 @@ jobs:
           if [ "${{ job.status }}" == "success" ]; then
             echo "✓ Rollback completed successfully"
             echo "Environment: ${{ inputs.environment }}"
-            echo "Rolled back to: ${{ inputs.previous_tag }}"
+            echo "Rolled back to tag: ${{ inputs.rollback_tag }}"
+            echo "Rollback image: ${{ steps.validate-image.outputs.rollback-image-uri }}"
+            echo "Cluster: ${{ inputs.ecs_cluster }}"
+            echo "Service: ${{ inputs.ecs_service }}"
+            echo "Previous task definition: ${{ steps.prepare-rollback.outputs.previous-task-definition-arn }}"
+            echo "Rollback task definition: ${{ steps.prepare-rollback.outputs.rollback-task-definition-arn }}"
+            echo "Reason: ${{ inputs.rollback_reason }}"
+            echo "Dry run: ${{ inputs.dry_run }}"
             echo "Initiated by: ${{ github.actor }}"
           else
             echo "✗ Rollback failed - manual intervention required"
